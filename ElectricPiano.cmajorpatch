@@ -1,0 +1,11 @@
+{
+  "CmajorVersion": 1,
+  "ID": "dev.cmajor.examples.electricpianoLearningsarc",
+  "version": "1.0",
+  "name": "Electric Piano Sarc",
+  "description": "This is a copy of electric piano, to start learning cmajor",
+  "category": "generator",
+  "manufacturer": "Sound Stacks Ltd / Sarc",
+  "isInstrument": true,
+  "source": "ElectricPiano.cmajor"
+}
