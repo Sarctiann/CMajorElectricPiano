@@ -52,11 +52,12 @@ namespace Instrument
         float releaseRate;
         float vibratoDepth;
         float vibratoRate;
+        float volume;
 
         float<harmonics> getDecay (float note)
         {
             float baseDecayRate = (this.decayRate / 20000.0f);
-            float harmonicScaling = 1.0f - (this.harmonicDecayRate / 20000.0f);
+            float harmonicScaling = 1.0f - (this.harmonicDecayRate / 40000.0f);
 
             float scalingMultiplier = (48.0f - note) / 12.0f;
             float keyScalingFactor = scalingMultiplier * (this.keyScaling * 0.02f);
@@ -64,7 +65,7 @@ namespace Instrument
             if (keyScalingFactor > 0)
                 baseDecayRate = 1.0f - (baseDecayRate / (1.0f + keyScalingFactor));
             else
-                baseDecayRate = 1.0f - (baseDecayRate * (1.0f - keyScalingFactor));
+                baseDecayRate = 1.0f - (baseDecayRate * 1.0f);
 
             float<harmonics> decay;
             float scaling = 1.0f;
@@ -85,15 +86,23 @@ namespace Instrument
 
         float<Instrument::harmonics> getInitialAmplitudes (float note, float  velocity)
         {
-            let velocity100 = float<Instrument::harmonics> (0.150869f, 0.385766f, 0.215543f, 0.117811f, 0.100411f, 0.0128637f,
-                                                            0.0288844f, 0.00243388f, 0.00963092f, 0.0035634f, 0.00256945f, 0.00184799f,
-                                                            0.000399878f, 0.000660576f, 3.00995e-05f, 0.00021866f, 9.33705e-05f,
-                                                            0.000177973f, 0.0002545f, 0.000323602f, 0.000779045f, 0.000116569f,
-                                                            0.000772873f, 0.000364486f, 0.000248027f, 0.00018236f, 3.27292e-05f,
-                                                            6.64988e-05f, 0.0f, 0.0f, 0.0f, 0.0f);
+            let velocity100 = float<Instrument::harmonics> (
+                0.150869f, 0.385766f, 0.215543f, 0.117811f,
+                0.100411f, 0.0128637f, 0.0288844f, 0.00243388f,
+                0.00963092f, 0.0035634f, 0.00256945f, 0.00184799f,
+                0.000399878f, 0.000660576f, 3.00995e-05f, 0.00021866f,
+                9.33705e-05f, 0.000177973f, 0.0002545f, 0.000323602f,
+                0.000779045f, 0.000116569f, 0.000772873f, 0.000364486f,
+                0.000248027f, 0.00018236f, 3.27292e-05f, 6.64988e-05f,
+                0.0f, 0.0f, 0.0f, 0.0f
+            );
 
-            let velocity0   = float<Instrument::harmonics> (0.05f, 0.03f, 0.01f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            let velocity0 = float<Instrument::harmonics> (
+                0.05f, 0.03f, 0.01f, 0, 0, 0, 0, 0, 
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0
+            );
 
             var v = (velocity100 * velocity) + (velocity0 * (1.0f - velocity));
 
@@ -131,6 +140,7 @@ namespace Instrument
             event float releaseRate           [[ name: "Release Rate",        min: 0.0, max: 100.0, init: 60, unit: "%" ]];
             event float vibratoDepth          [[ name: "Vibrato Intensity",   min: 0.0, max: 100.0, init: 25, unit: "%" ]];
             event float vibratoRate           [[ name: "Vibrato Speed",       min: 0.0, max: 100.0, init: 50, unit: "%" ]];
+            event float volume                [[ name: "Main Volume",         min: 0.0, max: 1.0, init: 0.75, unit: "%" ]];
         }
         
         output event Instrument::Params paramsOut;
@@ -145,6 +155,7 @@ namespace Instrument
         event releaseRate (float f)         { params.releaseRate = f;           paramsOut <- params; }
         event vibratoDepth (float f)        { params.vibratoDepth = f;          paramsOut <- params; }
         event vibratoRate (float f)         { params.vibratoRate = f;           paramsOut <- params; }
+        event volume (float f)              { params.volume = f;                paramsOut <- params; }
     }
 }
 
@@ -154,7 +165,8 @@ graph Voice
     input {
         event Instrument::Params paramsIn;
         event (
-            std::notes::NoteOn, std::notes::NoteOff, 
+            std::notes::NoteOn, 
+            std::notes::NoteOff, 
             std::notes::PitchBend
         ) eventsIn;
     }
@@ -165,15 +177,19 @@ graph Voice
     {
         osc = OscillatorBank (Instrument::harmonics);
         amplitudeSource = AmplitudeSource;
+        envelope = std::envelopes::FixedASR (0.007f, 0.5f);
+        attenuator = std::levels::DynamicGain (float);
     }
 
     connection
     {
+        eventsIn -> envelope -> attenuator.gain;
         paramsIn  -> osc.paramsIn, amplitudeSource.paramsIn;
-        eventsIn  -> osc.eventsIn, amplitudeSource.eventsIn;
+        eventsIn -> osc.eventsIn, amplitudeSource.eventsIn;
 
         amplitudeSource.out -> osc.amplitudes;
-        osc.audioOut        -> audioOut;
+        osc.audioOut -> attenuator.in;
+        attenuator -> audioOut;
     }
 }
 
@@ -196,7 +212,8 @@ processor OscillatorBank (int size = 64)
     event eventsIn (std::notes::NoteOn e)
     {
         notePitch = e.pitch;
-        oscillators = 1.15f;
+        oscillators = 1.0f;
+        setMultipliers();
     }
 
     event eventsIn (std::notes::PitchBend e)
@@ -275,6 +292,7 @@ processor AmplitudeSource
     let interpolatedSteps = 64;
     float<Instrument::harmonics> currentValue, release, decay;
     bool released = false;
+    float volume = 0.9f;
 
     event paramsIn (Instrument::Params p)
     {
@@ -283,6 +301,7 @@ processor AmplitudeSource
 
     event eventsIn (std::notes::NoteOn e)
     {
+        volume       = params.volume;
         release      = params.getRelease (e.pitch);
         decay        = params.getDecay (e.pitch);
         currentValue = params.getInitialAmplitudes (e.pitch, e.velocity);
@@ -303,7 +322,7 @@ processor AmplitudeSource
 
             loop (interpolatedSteps)
             {
-                out <- currentValue;
+                out <- currentValue * volume;
                 currentValue += increment;
                 advance();
             }
