@@ -11,8 +11,10 @@
 
 graph ElectricPiano  [[ main ]]
 {
-    input event std::midi::Message midiIn  [[ name: "MIDI input" ]];
-    input paramsProcessor.*;
+    input {
+        event std::midi::Message midiIn  [[ name: "MIDI input" ]];
+        paramsProcessor.*;
+    }
 
     output stream float<2> audioOut  [[ name: "Audio Out" ]];
 
@@ -26,6 +28,7 @@ graph ElectricPiano  [[ main ]]
 
     connection
     {
+        midiIn -> std::midi::MPEConverter -> Logger;
         midiIn -> std::midi::MPEConverter -> voiceAllocator -> voices.eventsIn;
 
         paramsProcessor.paramsOut -> voices.paramsIn, tremolo.paramsIn;
@@ -52,8 +55,8 @@ namespace Instrument
 
         float<harmonics> getDecay (float note)
         {
-            float baseDecayRate = (this.decayRate / 40000.0f);
-            float harmonicScaling = 1.0f - (this.harmonicDecayRate / 200000.0f);
+            float baseDecayRate = (this.decayRate / 20000.0f);
+            float harmonicScaling = 1.0f - (this.harmonicDecayRate / 20000.0f);
 
             float scalingMultiplier = (48.0f - note) / 12.0f;
             float keyScalingFactor = scalingMultiplier * (this.keyScaling * 0.02f);
@@ -89,7 +92,7 @@ namespace Instrument
                                                             0.000772873f, 0.000364486f, 0.000248027f, 0.00018236f, 3.27292e-05f,
                                                             6.64988e-05f, 0.0f, 0.0f, 0.0f, 0.0f);
 
-            let velocity0   = float<Instrument::harmonics> (0.02f, 0.05f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            let velocity0   = float<Instrument::harmonics> (0.05f, 0.03f, 0.01f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                                                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
             var v = (velocity100 * velocity) + (velocity0 * (1.0f - velocity));
@@ -119,15 +122,17 @@ namespace Instrument
 
     processor ParamsProcessor
     {
-        input event float brightness            [[ name: "Brightness",          min: 0.0, max: 100.0, init: 30, unit: "%" ]];
-        input event float velocityScaling       [[ name: "Velocity Scaling",    min: 0.0, max: 100.0, init: 50, unit: "%" ]];
-        input event float decayRate             [[ name: "Decay Rate",          min: 0.0, max: 100.0, init: 10, unit: "%" ]];
-        input event float harmonicDecayRate     [[ name: "Harmonic Decay Rate", min: 0.0, max: 100.0, init: 30, unit: "%" ]];
-        input event float keyScaling            [[ name: "Key Scaling",         min: 0.0, max: 100.0, init: 50, unit: "%" ]];
-        input event float releaseRate           [[ name: "Release Rate",        min: 0.0, max: 100.0, init: 60, unit: "%" ]];
-        input event float vibratoDepth          [[ name: "Vibrato Intensity",   min: 0.0, max: 100.0, init: 25, unit: "%" ]];
-        input event float vibratoRate           [[ name: "Vibrato Speed",       min: 0.0, max: 100.0, init: 50, unit: "%" ]];
-
+        input {
+            event float brightness            [[ name: "Brightness",          min: 0.0, max: 100.0, init: 30, unit: "%" ]];
+            event float velocityScaling       [[ name: "Velocity Scaling",    min: 0.0, max: 100.0, init: 50, unit: "%" ]];
+            event float decayRate             [[ name: "Decay Rate",          min: 0.0, max: 100.0, init: 10, unit: "%" ]];
+            event float harmonicDecayRate     [[ name: "Harmonic Decay Rate", min: 0.0, max: 100.0, init: 30, unit: "%" ]];
+            event float keyScaling            [[ name: "Key Scaling",         min: 0.0, max: 100.0, init: 50, unit: "%" ]];
+            event float releaseRate           [[ name: "Release Rate",        min: 0.0, max: 100.0, init: 60, unit: "%" ]];
+            event float vibratoDepth          [[ name: "Vibrato Intensity",   min: 0.0, max: 100.0, init: 25, unit: "%" ]];
+            event float vibratoRate           [[ name: "Vibrato Speed",       min: 0.0, max: 100.0, init: 50, unit: "%" ]];
+        }
+        
         output event Instrument::Params paramsOut;
 
         Instrument::Params params = createParams();
@@ -146,8 +151,13 @@ namespace Instrument
 //==============================================================================
 graph Voice
 {
-    input event Instrument::Params paramsIn;
-    input event (std::notes::NoteOn, std::notes::NoteOff, std::notes::PitchBend) eventsIn;
+    input {
+        event Instrument::Params paramsIn;
+        event (
+            std::notes::NoteOn, std::notes::NoteOff, 
+            std::notes::PitchBend
+        ) eventsIn;
+    }
 
     output stream float audioOut;
 
@@ -170,9 +180,11 @@ graph Voice
 //==============================================================================
 processor OscillatorBank (int size = 64)
 {
-    input event (std::notes::NoteOn, std::notes::PitchBend) eventsIn;
-    input event Instrument::Params paramsIn;
-    input stream float<size> amplitudes;
+    input {
+        event (std::notes::NoteOn, std::notes::PitchBend) eventsIn;
+        event Instrument::Params paramsIn;
+        stream float<size> amplitudes;
+    }
 
     output stream float audioOut;
 
@@ -184,16 +196,16 @@ processor OscillatorBank (int size = 64)
     event eventsIn (std::notes::NoteOn e)
     {
         notePitch = e.pitch;
-        oscillators = 1.0f;
+        oscillators = 1.15f;
     }
 
     event eventsIn (std::notes::PitchBend e)
     {
-        // console <- e;
-        if (e.bendSemitones > 0.1f) {
+        let tolerance = 0.1f;
+        if (e.bendSemitones > tolerance) {
             noteBend = 2.0f ** (e.bendSemitones / 12.0f);
         }
-        else if (e.bendSemitones < -0.1f) {
+        else if (e.bendSemitones < -1 * tolerance) {
             noteBend = 2.0f ** (e.bendSemitones / 12.0f);
         }
         else {
@@ -206,7 +218,7 @@ processor OscillatorBank (int size = 64)
 
     float<Instrument::harmonics> decay, release;
     float notePitch;
-    float noteBend;
+    float noteBend = 1.0f;
 
     void setMultipliers()
     {
@@ -252,8 +264,10 @@ processor OscillatorBank (int size = 64)
 //==============================================================================
 processor AmplitudeSource
 {
-    input event (std::notes::NoteOn, std::notes::NoteOff) eventsIn;
-    input event Instrument::Params paramsIn;
+    input {
+        event (std::notes::NoteOn, std::notes::NoteOff) eventsIn;
+        event Instrument::Params paramsIn;
+    }
 
     output stream float<Instrument::harmonics> out;
 
@@ -340,10 +354,28 @@ processor Tremolo
 //===================================SARC=======================================
 processor Logger
 {
-    input event (std::midi::Message) parseMIDI;
-    output event (std::midi::Message) eventsOut;
 
-    event parseMIDI (std::midi::Message e)
+    input event (
+        std::notes::NoteOn, 
+        std::notes::NoteOff, 
+        std::notes::PitchBend
+    ) eventsIn;
+
+    output event (
+        std::notes::NoteOn,
+        std::notes::NoteOff,
+        std::notes::PitchBend
+    ) eventsOut;
+
+    event eventsIn (std::notes::NoteOn e)
+    {
+        console <- e;
+    }
+    event eventsIn (std::notes::NoteOff e)
+    {
+        console <- e;
+    }
+    event eventsIn (std::notes::PitchBend e)
     {
         console <- e;
     }
