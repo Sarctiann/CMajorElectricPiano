@@ -28,7 +28,7 @@ graph ElectricPiano  [[ main ]]
 
     connection
     {
-        midiIn -> std::midi::MPEConverter -> Logger;
+        midiIn -> MidiLogger;
         midiIn -> std::midi::MPEConverter -> voiceAllocator -> voices.eventsIn;
 
         paramsProcessor.paramsOut -> voices.paramsIn, tremolo.paramsIn;
@@ -177,7 +177,7 @@ graph Voice
     {
         osc = OscillatorBank (Instrument::harmonics);
         amplitudeSource = AmplitudeSource;
-        envelope = std::envelopes::FixedASR (0.007f, 0.5f);
+        envelope = std::envelopes::FixedASR (0.01f, 0.5f);
         attenuator = std::levels::DynamicGain (float);
     }
 
@@ -371,32 +371,13 @@ processor Tremolo
 }
 
 //===================================SARC=======================================
-processor Logger
+processor MidiLogger
 {
+    input event (std::midi::Message) midiIn;
+    output event (std::midi::Message) midiOut;
 
-    input event (
-        std::notes::NoteOn, 
-        std::notes::NoteOff, 
-        std::notes::PitchBend
-    ) eventsIn;
-
-    output event (
-        std::notes::NoteOn,
-        std::notes::NoteOff,
-        std::notes::PitchBend
-    ) eventsOut;
-
-    event eventsIn (std::notes::NoteOn e)
-    {
-        console <- e;
-    }
-    event eventsIn (std::notes::NoteOff e)
-    {
-        console <- e;
-    }
-    event eventsIn (std::notes::PitchBend e)
-    {
-        console <- e;
+    event midiIn (std::midi::Message e) {
+        console <- e <- '\n';
     }
 
-}
+}   
