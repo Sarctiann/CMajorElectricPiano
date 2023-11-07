@@ -20,8 +20,8 @@ graph ElectricPiano  [[ main ]]
 
     node
     {
-        voices = Voice[16];
-        voiceAllocator = std::voices::VoiceAllocator(16);
+        voices = Voice[15];
+        voiceAllocator = std::voices::VoiceAllocator(15, 16);
         paramsProcessor = Instrument::ParamsProcessor;
         tremolo = Tremolo;
     }
@@ -140,7 +140,7 @@ namespace Instrument
             event float releaseRate           [[ name: "Release Rate",        min: 0.0, max: 100.0, init: 60, unit: "%" ]];
             event float vibratoDepth          [[ name: "Vibrato Intensity",   min: 0.0, max: 100.0, init: 25, unit: "%" ]];
             event float vibratoRate           [[ name: "Vibrato Speed",       min: 0.0, max: 100.0, init: 50, unit: "%" ]];
-            event float volume                [[ name: "Main Volume",         min: 0.0, max: 1.0, init: 0.75, unit: "%" ]];
+            event float volume                [[ name: "Main Volume",         min: 0.0, max: 1.0, init: 0.90, unit: "%" ]];
         }
         
         output event Instrument::Params paramsOut;
@@ -297,11 +297,11 @@ processor AmplitudeSource
     event paramsIn (Instrument::Params p)
     {
         params = p;
+        volume = params.volume;
     }
 
     event eventsIn (std::notes::NoteOn e)
     {
-        volume       = params.volume;
         release      = params.getRelease (e.pitch);
         decay        = params.getDecay (e.pitch);
         currentValue = params.getInitialAmplitudes (e.pitch, e.velocity);
