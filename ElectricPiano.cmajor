@@ -213,7 +213,6 @@ processor OscillatorBank (int size = 64)
     {
         notePitch = e.pitch;
         oscillators = 1.0f;
-        noteBend = 1.0f;
         setMultipliers();
     }
 
@@ -378,7 +377,9 @@ processor MidiLogger
     output event (std::midi::Message) midiOut;
 
     event midiIn (std::midi::Message e) {
-        console <- e <- '\n';
+        if (!e.isClock()) {
+            console <- e <- '\n';
+        }
     }
 
 }   
