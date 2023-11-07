@@ -213,6 +213,7 @@ processor OscillatorBank (int size = 64)
     {
         notePitch = e.pitch;
         oscillators = 1.0f;
+        noteBend = 1.0f;
         setMultipliers();
     }
 
