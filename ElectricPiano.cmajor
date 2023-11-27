@@ -221,14 +221,15 @@ processor OscillatorBank (int size = 64)
         let tolerance = 0.1f;
         if (e.bendSemitones > tolerance) {
             noteBend = 2.0f ** (e.bendSemitones / 12.0f);
+            setMultipliers();
         }
         else if (e.bendSemitones < -1 * tolerance) {
             noteBend = 2.0f ** (e.bendSemitones / 12.0f);
+            setMultipliers();
         }
         else {
             noteBend = 1.0f;
         }
-        setMultipliers();
     }
 
     Instrument::Params params;
